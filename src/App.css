@@ -1,0 +1,31 @@
+#App {
+  display: grid;
+  grid-template-rows: 500px 500px;
+  grid-template-columns: 500px 700px;
+}
+
+#tree-div {
+  overflow: scroll;
+}
+
+#plot-div {
+  overflow: scroll;
+}
+
+.axis text {
+  font: sans-serif;
+}
+
+.axis line,
+.axis path {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+.axis {
+  shape-rendering: crispedges;
+  font: 10px sans-serif;
+}
+
+
