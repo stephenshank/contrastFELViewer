@@ -81,6 +81,41 @@ class App extends Component {
     viewer.cartoon('protein', chain);
     viewer.autoZoom();
 
+    function setColorForAtom(go, atom, color){
+      var view = go.structure().createEmptyView();
+      view.addAtom(atom);
+      go.colorBy(pv.color.uniform(color), view);
+    }
+
+    var prevPicked = null;
+    structure_div.addEventListener('mousemove', function(event){
+      var rect = viewer.boundingClientRect();
+      var picked = viewer.pick({ x : event.clientX - rect.left,
+            y : event.clientY - rect.top });
+      if (prevPicked !== null && picked !== null &&
+        picked.target() === prevPicked.atom){
+        return;
+      }
+      if (prevPicked !== null){
+        setColorForAtom(prevPicked.node, prevPicked.atom, prevPicked.color);
+      }
+      if (picked !== null){
+        var atom = picked.target();
+        var index = atom.residue().num();
+        console.log(atom.qualifiedName());
+        //document.getElementById('changes').innerHTML = (index+1) + changes[index]
+        var color = [0,0,0,0];
+        picked.node().getColorForAtom(atom, color);
+        prevPicked = { atom : atom, color : color, node : picked.node() };
+        setColorForAtom(picked.node(), atom, 'green');
+      }
+      else{
+        //document.getElementById('changes').innerHTML = '&nbsp;';
+        prevPicked = null;
+      }
+      viewer.requestRedraw();
+    });
+
     this.tree.svg(d3.select("#tree")).layout();
 
     const number_of_sites = this.sequence_data[0].seq.length,
@@ -199,6 +234,7 @@ class App extends Component {
       .attr('stroke', '#bbb')
       .attr('stroke-dasharray', '3,4')
       .attr('stroke-width', '1px');
+
 
   }
   takeSnapshot() {

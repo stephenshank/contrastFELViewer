@@ -3,7 +3,7 @@ const webpack = require('webpack'),
   HtmlWebpackPlugin = require('html-webpack-plugin');
 
 module.exports = {
-  entry: path.resolve('src', 'App.js'),
+  entry: path.resolve('js', 'App.js'),
   plugins: [
     new HtmlWebpackPlugin({
       title: "ACME Thailand HAND Structural Viewer"
