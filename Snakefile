@@ -18,18 +18,18 @@ rule translate:
   run:
     translate(input.fasta, output.fasta)
 
-rule alignment:
+rule profile_alignment:
   input:
     reference="data/ref_struct.fasta",
     patient=rules.translate.output.fasta
   output:
-    fasta="data/{patient_id}_cFEL/{patient_id}_displayed.fasta"
+    fasta="data/{patient_id}_cFEL/{patient_id}_profile.fasta"
   shell:
     "mafft --add {input.reference} {input.patient} > {output.fasta}"
 
 rule json:
   input:
-    fasta=rules.alignment.output.fasta,
+    fasta=rules.profile_alignment.output.fasta,
     json=rules.remove_all_gap_columns.output.json
   output:
     json="data/{patient_id}_cFEL/{patient_id}.json"

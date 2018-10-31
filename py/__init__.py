@@ -2,41 +2,62 @@ import json
 
 import pandas as pd
 from Bio import SeqIO
+from Bio.Seq import Seq
 import numpy as np
 
 
+class Alignment:
+    def __init__(self, path):
+        records = SeqIO.parse(path, 'fasta')
+        nucleotides = []
+        self.headers = []
+        for record in records:
+            nucleotides.append(list(str(record.seq)))
+            self.headers.append(record.id)
+        self.sequence_data = np.array(nucleotides, dtype='<U1')
+        self.number_of_sequences = self.sequence_data.shape[0]
+        self.number_of_sites = self.sequence_data.shape[1]
+
+    def remove_all_gap_columns(self):
+        number_of_gaps = np.sum(self.sequence_data == '-', axis=0)
+        all_gaps = number_of_gaps == self.number_of_sequences
+        indices = np.arange(self.number_of_sites)[~all_gaps]
+        print('removing ', np.arange(self.number_of_sites)[all_gaps])
+        self.sequence_data = self.sequence_data[:, ~all_gaps]
+        return indices
+
+    def write(self, path):
+        with open(path, 'w') as output_file:
+            for i, header in enumerate(self.headers):
+                output_file.write('>' + header + '\n')
+                output_file.write(''.join(self.sequence_data[i, :]))
+                output_file.write('\n')
+
+    def translate(self):
+        amino_acids = []
+        for i in range(self.number_of_sequences):
+            translated = Seq(''.join(self.sequence_data[i, :])).translate(gap='-')
+            amino_acids.append(translated)
+        self.sequence_data = np.array(amino_acids, dtype='<U1')
+
+
 def remove_all_gap_columns(input, output_fasta, output_json):
-    records = SeqIO.parse(input, 'fasta')
-    nucleotides = []
-    headers = []
-    for record in records:
-        nucleotides.append(list(str(record.seq)))
-        headers.append(record.id)
-    sequence_data = np.array(nucleotides, dtype='<U1')
-    number_of_sequences = sequence_data.shape[0]
-    number_of_sites = sequence_data.shape[1]
-    all_gaps = np.sum(sequence_data == '-', axis=0) == number_of_sequences
-
-    with open(output_fasta, 'w') as output_file:
-        for i, header in enumerate(headers):
-            output_file.write('>' + header + '\n')
-            output_file.write(''.join(sequence_data[i, ~all_gaps]))
-            output_file.write('\n')
-    indices = np.arange(number_of_sites)[~all_gaps]
-
-    count_gaps = np.sum(sequence_data[:, ~all_gaps] == '-', axis=1)
+    alignment = Alignment(input)
+    indices = alignment.remove_all_gap_columns()
+    count_gaps = np.sum(alignment.sequence_data == '-', axis=0)
     no_gap = np.argmin(count_gaps)
     assert count_gaps[no_gap] == 0
+    alignment.write(output_fasta)
+    
+    result = {"indices": indices.tolist(), "no_gaps": no_gap}
     with open(output_json, 'w') as output_file:
-        result = {"indices": indices.tolist(), "no_gaps": no_gap}
         json.dump(indices.tolist(), output_file)
 
 
 def translate(input, output):
-    records = list(SeqIO.parse(input, 'fasta'))
-    for record in records:
-        record.seq = record.seq.translate(gap='-')
-    SeqIO.write(records, output, 'fasta')
+    alignment = Alignment(input)
+    alignment.translate()
+    alignment.write(output)
 
 
 def bundle_json(input, output, patient_id):
