@@ -47,11 +47,16 @@ def remove_all_gap_columns(input, output_fasta, output_json):
     count_gaps = np.sum(alignment.sequence_data == '-', axis=0)
     no_gap = np.argmin(count_gaps)
     assert count_gaps[no_gap] == 0
+    header = alignment.headers[no_gap]
     alignment.write(output_fasta)
     
-    result = {"indices": indices.tolist(), "no_gaps": no_gap}
+    result = {"indices": indices.tolist(), "no_gaps": header}
     with open(output_json, 'w') as output_file:
-        json.dump(indices.tolist(), output_file)
+        json.dump(result, output_file)
+
+
+def get_plot_data(hyphy_indices, added_alignment, reference, hyphy_data, output):
+    return
 
 
 def translate(input, output):

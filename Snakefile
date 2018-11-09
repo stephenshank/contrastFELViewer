@@ -18,19 +18,30 @@ rule translate:
   run:
     translate(input.fasta, output.fasta)
 
-rule profile_alignment:
+rule added_alignment:
   input:
     reference="data/ref_struct.fasta",
     patient=rules.translate.output.fasta
   output:
-    fasta="data/{patient_id}_cFEL/{patient_id}_profile.fasta"
+    fasta="data/{patient_id}_cFEL/{patient_id}_added.fasta"
   shell:
     "mafft --add {input.reference} {input.patient} > {output.fasta}"
 
+rule get_plot_data:
+  input:
+    json=rules.remove_all_gap_columns.output.json,
+    fasta=rules.added_alignment.output.fasta,
+    reference="data/ref_struct.fasta",
+    hyphy="data/{patient_id}_cFEL/{patient_id}.fna.FEL.json"
+  output:
+    json="data/{patient_id}_cFEL/{patient_id}_mappedIndices.json"
+  run:
+    get_plot_data(input.json, input.fasta, input.reference, input.hyphy, output.json)
+
 rule json:
   input:
-    fasta=rules.profile_alignment.output.fasta,
-    json=rules.remove_all_gap_columns.output.json
+    fasta=rules.added_alignment.output.fasta,
+    json=rules.get_plot_data.output.json
   output:
     json="data/{patient_id}_cFEL/{patient_id}.json"
   run:

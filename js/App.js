@@ -1,85 +1,285 @@
 import React, { Component } from 'react';
 import ReactDOM from 'react-dom';
 import './App.css';
-import { BaseAlignment, fastaParser, ScrollBroadcaster } from 'alignment.js';
+import {
+  BaseAlignment, BaseTree, fastaParser, ScrollBroadcaster, SequenceAxis,
+  sortFASTAAndNewick, computeLabelWidth
+} from 'alignment.js';
+import { Navbar, Nav, NavDropdown, NavItem, Grid, Row, Col } from 'react-bootstrap';
 import html2canvas from 'html2canvas';
+import 'bootstrap/dist/css/bootstrap.css'; 
+import 'bootstrap/dist/css/bootstrap-theme.css';
+import 'alignment.js/lib/alignment.css';
+
 const pv = require('bio-pv');
 const d3 = require("d3");
+const $ = require("jquery");
 require("phylotree");
+
+
+const legend = {
+  Monocytes: 'red',
+  Plasma: 'blue',
+  T_cells: 'Goldenrod'
+};
 
 
 class App extends Component {
   constructor(props) {
     super(props);
-    this.state = { json: null };
-    this.sequence_data = null;
+    this.state = {
+      patient_id: null,
+      fasta: null,
+      newick: null,
+      hyphy: null,
+      structure: null
+    };
+    this.patient_ids = ['P01', 'P02', 'P13'];
   }
   componentDidMount() {
-    d3.json("/data/P01.json", (err, json) => {
-      this.sequence_data = fastaParser(json.fasta);
-      this.number_of_sequences = this.sequence_data.length;
-      this.site_size = 20;
-      this.tree_size = this.number_of_sequences * this.site_size;
-      this.tree = d3.layout
-        .phylotree()
-        .options({
-          "left-right-spacing": "fit-to-size",
-          "top-bottom-spacing": "fit-to-size",
-          "show-scale": false,
-          "align-tips": true,
-          "show-labels": false,
-          selectable: false
-        })
-        .size([this.tree_size, 500])
-        .node_circle_size(0);
-      this.parsed = d3.layout.newick_parser(json.newick);
-      this.tree(this.parsed);
-
-      var i = 0;
-      this.tree.traverse_and_compute(function(n) {
-        var d = 1;
-        if (!n.name) {
-          n.name = "Node" + i++;
-        }
-        if (n.children && n.children.length) {
-          d += d3.max(n.children, function(d) {
-            return d["count_depth"];
-          });
-        }
-        n["count_depth"] = d;
+    this.fetchPatientData('P01');
+    document
+      .getElementById('bar-chart-div')
+      .addEventListener("alignmentjs_wheel_event", function(e) {
+        $('#bar-chart-div').scrollLeft(e.detail.x_pixel);
       });
 
-      this.tree.resort_children(function(a, b) {
-        return a["count_depth"] - b["count_depth"];
-      }, null, null, true);
-
-      const ordered_leaf_names = this.tree
-        .get_nodes(true)
-        .filter(d3.layout.phylotree.is_leafnode)
-        .map(d => d.name.split('_')[0]);
-
-      this.sequence_data.sort((a, b) => {
-        const a_index = ordered_leaf_names.indexOf(a.header),
-          b_index = ordered_leaf_names.indexOf(b.header);
-        return a_index - b_index;
+  }
+  shouldComponentUpdate(nextProps, nextState) {
+    const different_ids = this.state.patient_id != nextState.patient_id;
+    return different_ids;
+  }
+  componentDidUpdate(prevProps, prevState) {
+    const { patient_id } = this.state;
+    if(patient_id != prevState.patent) {
+      this.fetchPatientData(patient_id);
+    }
+  }
+  fetchPatientData(patient_id) {
+    d3.json(`/data/${patient_id}_cFEL/${patient_id}.json`, (err, json) => {
+      this.setState({
+        patient_id: patient_id,
+        fasta: json.fasta,
+        newick: json.newick,
+        hyphy: json.hyphy,
+        structure: json.structure
       });
-      this.setState({json: json});
     });
   }
+  takeSnapshot() {
+    html2canvas(document.getElementById('full-viz'))
+      .then(function(canvas) {
+        var a = document.createElement('a');
+        a.href = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
+        a.download = 'somefilename.png';
+        a.click();
+        a.remove();
+      });
+  }
+  render() {
+    const self = this;
+    return (<div>
+      <Navbar>
+        <Navbar.Header>
+          <Navbar.Brand>
+            <a href="#home">ACME HyPhy Structural Viewer</a>
+          </Navbar.Brand>
+        </Navbar.Header>
+        <Nav pullRight>
+          <NavItem onClick={()=>this.takeSnapshot()}>Snapshot</NavItem>
+          {self.patient_ids.map(patient_id => {
+            return (<NavItem
+              eventKey={patient_id}
+              key={patient_id}
+              active={patient_id == self.state.patient}
+              onSelect={(eventKey)=>this.setState({patient_id: patient_id})}
+            >
+              {patient_id}
+            </NavItem>);
+          })}
+        </Nav>
+      </Navbar>
+      <Grid>
+        <Row>
+          <Col>
+            <StructuralViz
+              fasta={this.state.fasta}
+              newick={this.state.newick}
+              hyphy={this.state.hyphy}
+              structure={this.state.structure}
+              patient_id={this.state.patient}
+            />
+          </Col>
+        </Row>
+      </Grid>
+    </div>);
+  }
+}
+
+class StructuralViz extends Component {
+  constructor(props) {
+    super(props);
+    this.column_sizes = [500, 200, 700];
+    this.row_sizes = [500, 40, 500];
+    this.initialize(props);
+  }
+  componentWillUpdate(nextProps) {
+    this.initialize(nextProps);
+  }
   componentDidUpdate() {
+    this.initializeBar(this.props.hyphy);
+  }
+  initialize(props) {
+    if(props.fasta) {
+      const all_sequence_data = fastaParser(props.fasta);
+      all_sequence_data.sort((a, b) => {
+        if(a.header.indexOf('HXB2') > -1) return -1;
+        if(b.header.indexOf('HXB2') > -1) return 1;
+        if(a.header.indexOf('3JWO') > -1) return -1;
+        if(b.header.indexOf('3JWO') > -1) return 1;
+        return 1;      
+      });
+
+      this.reference_sequence_data = all_sequence_data.slice(0,2);
+      this.patient_sequence_data = all_sequence_data.slice(2);
+      this.full_pixel_height = this.props.site_size * this.patient_sequence_data.length;
+      this.number_of_sites = all_sequence_data[0].seq.length;
+      this.full_pixel_width = this.props.site_size * this.number_of_sites;
+      this.label_width = computeLabelWidth(
+        all_sequence_data,
+        this.props.label_padding
+      ) + 7;
+
+      this.column_sizes[0] += this.column_sizes[1] - this.label_width;
+      this.column_sizes[1] = this.label_width;
+
+      const phylotree_size = [this.full_pixel_height, this.column_sizes[0]];
+      const { phylotree } = sortFASTAAndNewick(
+        this.patient_sequence_data,
+        props.newick,
+        phylotree_size
+      );
+      phylotree.style_edges(function(element, data) {
+        if(data.target.Monocytes) element.style('stroke', legend.Monocytes);
+        if(data.target.Plasma) element.style('stroke', legend.Plasma);
+        if(data.target.T_cells) element.style('stroke', legend.T_cells);
+      });
+      this.phylotree = phylotree;
+
+      this.initializeStructure(props);
+      this.setScrollingEvents(props);
+    }
+  }
+  setScrollingEvents() {
+    const width = this.column_sizes[2],
+      height = this.row_sizes[2];
+    const { full_pixel_width, full_pixel_height, label_width } = this;
+    this.scroll_broadcaster = new ScrollBroadcaster({
+      width: full_pixel_width,
+      height: full_pixel_height,
+      x_pad: width,
+      y_pad: height,
+      x_pixel: this.x_pixel || 0,
+      y_pixel: this.y_pixel || 0,
+      bidirectional: [
+        "alignmentjs-tree-div",
+        "alignmentjs-labels-div",
+        "reference-alignment",
+        "alignmentjs-alignment",
+        "bar-chart-div"
+      ]
+    });
+  }
+  handleBarWheel(e) {
+    e.preventDefault();
+    this.scroll_broadcaster.handleWheel(e, 'main');
+  }
+  initializeBar(hyphy) {
+    const data = JSON.parse(hyphy).MLE.content["0"];
+    const { full_pixel_width } = this,
+      { site_size } = this.props,
+      site_scale = d3.scale.linear()
+        .domain([1, this.number_of_sites])
+        .range([site_size/2, full_pixel_width-site_size/2]),
+      site_axis = d3.svg.axis()
+        .scale(site_scale)
+        .orient("bottom")
+        .tickValues(d3.range(1, this.number_of_sites, 2));
+
+    const plot_svg = d3.select("#bar-chart");
+    plot_svg.html("");
+    plot_svg.attr("width", full_pixel_width)
+      .attr("height", 500);
+
+    plot_svg
+      .append("g")
+      .attr("class", "axis")
+      .attr("transform", "translate(0, 475)")
+      .call(site_axis);
+
+    const y_min = d3.min(data.map(row=>{
+      return d3.min([
+        (row[1]-row[0])/row[9],
+        (row[2]-row[0])/row[9],
+        (row[3]-row[0])/row[9],
+        (row[4]-row[0])/row[9]
+      ])
+    }));
+    const y_max = d3.max(data.map(row=>{
+      return d3.max([
+        (row[1]-row[0])/row[9],
+        (row[2]-row[0])/row[9],
+        (row[3]-row[0])/row[9],
+        (row[4]-row[0])/row[9]
+      ])
+    }));
+
+    const statistic_scale = d3.scale.linear()
+        .domain([y_min, y_max])
+        .range([400, 0]),
+      statistic_axis = d3.svg.axis()
+        .scale(statistic_scale)
+        .orient("left"),
+      bar_axis_width = this.column_sizes[1],
+      bar_axis_height = this.row_sizes[0],
+      bar_axis_svg = d3.select("#bar-axis")
+        .attr("width", bar_axis_width)
+        .attr("height", bar_axis_height);
+
+      bar_axis_svg.append("g")
+        .attr("class", "axis")
+        .attr("transform", `translate(${bar_axis_width-1}, 75)`)
+        .call(statistic_axis);
+      
+    bar_axis_svg.append('g')
+      .attr('transform', 'translate(70, 350)')
+      .append("text")
+        .attr('x', 0)
+        .attr('y', 0)
+        .text('Magical evolutionary statistic')
+        .attr('transform', 'rotate(270)');
+  }
+  initializeStructure(props) {
     const options = {
-        width: 500,
-        height: 500,
+        width: this.column_sizes[0],
+        height: this.row_sizes[0],
         antialias: true,
         quality : 'medium',
         background: '#FFF'
       },
       structure_div = document.getElementById('structure'),
       viewer = pv.Viewer(structure_div, options),
-      structure = pv.io.pdb(this.state.json.structure, options),
+      structure = pv.io.pdb(props.structure, options),
       chain = structure.select({chain: 'A'});
-    viewer.cartoon('protein', chain);
+    const geom = viewer.cartoon('protein', chain);
     viewer.autoZoom();
+    geom.colorBy(new pv.color.ColorOp(function(atom, out, index) {
+      const background_color = .8;
+      out[index] = background_color;
+      out[index + 1] = background_color;
+      out[index + 2] = background_color;
+      out[index + 3] = background_color;
+    }));
 
     function setColorForAtom(go, atom, color){
       var view = go.structure().createEmptyView();
@@ -102,7 +302,6 @@ class App extends Component {
       if (picked !== null){
         var atom = picked.target();
         var index = atom.residue().num();
-        console.log(atom.qualifiedName());
         //document.getElementById('changes').innerHTML = (index+1) + changes[index]
         var color = [0,0,0,0];
         picked.node().getColorForAtom(atom, color);
@@ -115,93 +314,96 @@ class App extends Component {
       }
       viewer.requestRedraw();
     });
+  }
+  render() {
+    const template_css = {
+      display: "grid",
+      gridTemplateColumns: this.column_sizes.join("px ") + "px",
+      gridTemplateRows: this.row_sizes.join("px ") + "px"
+    };
+    return (<div id='full-viz' style={template_css}>
+      <div id='structure'/>
 
-    this.tree.svg(d3.select("#tree")).layout();
+      <div id='bar-axis-svg'>
+        <svg id='bar-axis' />
+      </div>
 
-    const number_of_sites = this.sequence_data[0].seq.length,
-        full_alignment_width = this.site_size * number_of_sites;
-    const scroll_broadcaster = new ScrollBroadcaster(
-      { width: full_alignment_width, height: this.tree_size },
-      { width: 700, height: 500},
-      { x_pixel: 0, y_pixel: 0 },
-      [
-        "tree-div",
-        "alignmentjs-alignment",
-        "plot-div"
-      ]
-    );
-    
-    scroll_broadcaster.setListeners();
+      <div
+        id='bar-chart-div'
+        style={{overflowX: "scroll"}}
+        onWheel={e => this.handleBarWheel(e)}
+      >
+        <svg
+          id='bar-chart'
+          width={this.full_pixel_width}
+          height={this.row_sizes[1]}
+        />
+      </div>
 
-    $("#tree-div").off("wheel");
-    $("#tree-div").on("wheel", function(e) {
-      const e_mock = {
-        originalEvent: {
-          deltaX: 0,
-          deltaY: e.originalEvent.deltaY
-        }
-      };
-      scroll_broadcaster.handleWheel(e_mock, "tree");
-    });
+      <div>
+        <svg width={this.column_sizes[0]} height={this.row_sizes[1]}>
+          <g transform="translate(60, 10)">
+            <rect x="0" y="0" width="20" height="20" fill={legend.Monocytes} />
+            <text x="25" y="10" textAnchor="start" alignmentBaseline="middle">Monocytes</text>
+          </g>
+          <g transform="translate(260, 10)">
+            <rect x="0" y="0" width="20" height="20" fill={legend.Plasma} />
+            <text x="25" y="10" textAnchor="start" alignmentBaseline="middle">Plasma</text>
+          </g>
+          <g transform="translate(460, 10)">
+            <rect x="0" y="0" width="20" height="20" fill={legend.T_cells} />
+            <text x="25" y="10" textAnchor="start" alignmentBaseline="middle">T cell</text>
+          </g>
+        </svg>
+      </div>
 
-    $("#alignmentjs-alignment").off("wheel");
-    $("#alignmentjs-alignment").on("wheel", function(e) {
-      e.preventDefault();
-      scroll_broadcaster.handleWheel(e, "alignment");
-    });
+      <SequenceAxis
+        width={this.column_sizes[1]}
+        height={this.row_sizes[1]}
+        sequence_data={this.reference_sequence_data}
+        id="reference"
+      />
 
-    document
-      .getElementById("tree-div")
-      .addEventListener("alignmentjs_wheel_event", function(e) {
-        $("#tree-div").scrollTop(e.detail.y_pixel);
-      });
+      <BaseAlignment
+        width={this.column_sizes[2]}
+        height={this.row_sizes[1]}
+        sequence_data={this.reference_sequence_data}
+        id='reference'
+        amino_acid
+        disableVerticalScrolling
+        scroll_broadcaster={this.scroll_broadcaster}
+      />
 
-    document
-      .getElementById("plot-div")
-      .addEventListener("alignmentjs_wheel_event", function(e) {
-        $("#plot-div").scrollLeft(e.detail.x_pixel);
-      });
+      <BaseTree
+        phylotree={this.phylotree}
+        scroll_broadcaster={this.scroll_broadcaster}
+      />
 
-    const x_scale = d3.scale.linear()
-      .domain([1, number_of_sites])
-      .range([this.site_size/2, full_alignment_width-this.site_size/2]);
+      <SequenceAxis
+        width={this.column_sizes[1]}
+        height={this.row_sizes[2]}
+        sequence_data={this.patient_sequence_data}
+        scroll_broadcaster={this.scroll_broadcaster}
+      />
 
-    var plot_svg = d3.select("#plot");
-    plot_svg.html("");
-    plot_svg.attr("width", full_alignment_width)
-      .attr("height", 500);
+      <BaseAlignment
+        width={this.column_sizes[2]}
+        height={this.row_sizes[2]}
+        amino_acid
+        sequence_data={this.patient_sequence_data}
+        scroll_broadcaster={this.scroll_broadcaster}
+      />
+    </div>);
+  }
+}
 
-    var alignment_axis = d3.svg.axis()
-      .orient("bottom")
-      .scale(x_scale)
-      .tickValues(d3.range(1, number_of_sites, 2));
+StructuralViz.defaultProps = {
+  site_size: 20,
+  label_padding: 5
+}
 
-    plot_svg
-      .append("g")
-      .attr("class", "axis")
-      .attr("transform", "translate(0, 475)")
-      .call(alignment_axis);
-
-    const data = JSON.parse(this.state.json.hyphy).MLE.content["0"];
-    const y_min = d3.min(data.map(row=>{
-      return d3.min([
-        (row[1]-row[0])/row[9],
-        (row[2]-row[0])/row[9],
-        (row[3]-row[0])/row[9],
-        (row[4]-row[0])/row[9]
-      ])
-    }));
-    const y_max = d3.max(data.map(row=>{
-      return d3.max([
-        (row[1]-row[0])/row[9],
-        (row[2]-row[0])/row[9],
-        (row[3]-row[0])/row[9],
-        (row[4]-row[0])/row[9]
-      ])
-    }));
-    const y_scale = d3.scale.linear()
-      .domain([y_min, y_max])
-      .range([0, 400]);
+class OldStructuralViz extends Component {
+  componentDidUpdate() {
     const tcell_line = d3.svg.line()
       .x((d,i)=>x_scale(i+1))
       .y(d=>y_scale((d[1]-d[0])/(d[9]+.001)));
@@ -234,38 +436,6 @@ class App extends Component {
       .attr('stroke', '#bbb')
       .attr('stroke-dasharray', '3,4')
       .attr('stroke-width', '1px');
-
-
-  }
-  takeSnapshot() {
-    html2canvas(document.getElementById('App'))
-      .then(function(canvas) {
-        var a = document.createElement('a');
-        a.href = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
-        a.download = 'somefilename.png';
-        a.click();
-        a.remove();
-      });
-  }
-  render() {
-    return (<div>
-      <button onClick={()=>this.takeSnapshot()}>Snapshot</button>
-      <div id="App">
-        <div id="structure" />
-        <div id="plot-div">
-          <svg id="plot" />
-        </div>
-        <div id="tree-div">
-          <svg id="tree" />
-        </div>
-        <BaseAlignment
-          amino_acid
-          width={700}
-          height={500}
-          sequence_data={this.sequence_data}
-        />
-      </div>
-    </div>);
   }
 }
 

@@ -9,6 +9,7 @@
     "bootstrap": "3",
     "d3": "3",
     "html2canvas": "^1.0.0-alpha.12",
+    "jquery": "3.3.1",
     "phylotree": "0.2.0-alpha.1",
     "react": "^16.2.0",
     "react-bootstrap": "^0.32.0",
@@ -39,6 +40,7 @@
     "webpack-dev-server": "^2.9.7"
   },
   "scripts": {
-    "start": "./node_modules/.bin/webpack-dev-server --open --host 0.0.0.0"
+    "start": "./node_modules/.bin/webpack-dev-server --open --host 0.0.0.0",
+    "dag": "snakemake --dag data/P01_cFEL/P01.json | dot -Tsvg > dag.svg && open dag.svg && rm dag.svg"
   }
 }
