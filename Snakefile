@@ -1,22 +1,22 @@
 from py import *
 
 
-rule remove_all_gap_columns:
+rule translate:
   input:
     fasta="data/{patient_id}_cFEL/{patient_id}.fasta"
+  output:
+    fasta="data/{patient_id}_cFEL/{patient_id}_AA.fasta"
+  run:
+    translate(input.fasta, output.fasta)
+
+rule remove_all_gap_columns:
+  input:
+    fasta=rules.translate.output.fasta
   output:
     fasta="data/{patient_id}_cFEL/{patient_id}_noGaps.fasta",
     json="data/{patient_id}_cFEL/{patient_id}_noGaps.json"
   run:
     remove_all_gap_columns(input.fasta, output.fasta, output.json)
-
-rule translate:
-  input:
-    fasta=rules.remove_all_gap_columns.output.fasta
-  output:
-    fasta="data/{patient_id}_cFEL/{patient_id}_AA.fasta"
-  run:
-    translate(input.fasta, output.fasta)
 
 rule added_alignment:
   input:

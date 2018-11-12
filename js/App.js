@@ -39,9 +39,9 @@ class App extends Component {
   componentDidMount() {
     this.fetchPatientData('P01');
     document
-      .getElementById('bar-chart-div')
+      .getElementById('hyphy-chart-div')
       .addEventListener("alignmentjs_wheel_event", function(e) {
-        $('#bar-chart-div').scrollLeft(e.detail.x_pixel);
+        $('#hyphy-chart-div').scrollLeft(e.detail.x_pixel);
       });
 
   }
@@ -173,7 +173,7 @@ class StructuralViz extends Component {
   setScrollingEvents() {
     const width = this.column_sizes[2],
       height = this.row_sizes[2];
-    const { full_pixel_width, full_pixel_height, label_width } = this;
+    const { full_pixel_width, full_pixel_height } = this;
     this.scroll_broadcaster = new ScrollBroadcaster({
       width: full_pixel_width,
       height: full_pixel_height,
@@ -186,16 +186,15 @@ class StructuralViz extends Component {
         "alignmentjs-labels-div",
         "reference-alignment",
         "alignmentjs-alignment",
-        "bar-chart-div"
+        "hyphy-chart-div"
       ]
     });
   }
-  handleBarWheel(e) {
+  handleHyPhyWheel(e) {
     e.preventDefault();
     this.scroll_broadcaster.handleWheel(e, 'main');
   }
   initializeBar(hyphy) {
-    const data = JSON.parse(hyphy).MLE.content["0"];
     const { full_pixel_width } = this,
       { site_size } = this.props,
       site_scale = d3.scale.linear()
@@ -206,7 +205,7 @@ class StructuralViz extends Component {
         .orient("bottom")
         .tickValues(d3.range(1, this.number_of_sites, 2));
 
-    const plot_svg = d3.select("#bar-chart");
+    const plot_svg = d3.select("#hyphy-chart");
     plot_svg.html("");
     plot_svg.attr("width", full_pixel_width)
       .attr("height", 500);
@@ -217,47 +216,95 @@ class StructuralViz extends Component {
       .attr("transform", "translate(0, 475)")
       .call(site_axis);
 
-    const y_min = d3.min(data.map(row=>{
-      return d3.min([
-        (row[1]-row[0])/row[9],
-        (row[2]-row[0])/row[9],
-        (row[3]-row[0])/row[9],
-        (row[4]-row[0])/row[9]
-      ])
-    }));
-    const y_max = d3.max(data.map(row=>{
-      return d3.max([
-        (row[1]-row[0])/row[9],
-        (row[2]-row[0])/row[9],
-        (row[3]-row[0])/row[9],
-        (row[4]-row[0])/row[9]
-      ])
-    }));
+    const y_min = 0;
+    const y_max = d3.max([
+      d3.max(hyphy.alpha),
+      d3.max(hyphy['beta (T_cells)']),
+      d3.max(hyphy['beta (Monocytes)']),
+      d3.max(hyphy['beta (background)']),
+      d3.max(hyphy['beta (Plasma)'])
+    ]);
 
-    const statistic_scale = d3.scale.linear()
+    const hyphy_axis_width = this.column_sizes[1],
+      hyphy_axis_height = this.row_sizes[0],
+      line_plot_height = 300,
+      annotation_plot_height = hyphy_axis_height - line_plot_height,
+      x_axis_height = 25,
+      line_plot_offset = annotation_plot_height-x_axis_height,
+      statistic_scale = d3.scale.linear()
         .domain([y_min, y_max])
-        .range([400, 0]),
+        .range([line_plot_height, 0]),
       statistic_axis = d3.svg.axis()
         .scale(statistic_scale)
         .orient("left"),
-      bar_axis_width = this.column_sizes[1],
-      bar_axis_height = this.row_sizes[0],
-      bar_axis_svg = d3.select("#bar-axis")
-        .attr("width", bar_axis_width)
-        .attr("height", bar_axis_height);
 
-      bar_axis_svg.append("g")
+      hyphy_axis_svg = d3.select("#hyphy-axis")
+        .attr("width", hyphy_axis_width)
+        .attr("height", hyphy_axis_height);
+
+      hyphy_axis_svg.append("g")
         .attr("class", "axis")
-        .attr("transform", `translate(${bar_axis_width-1}, 75)`)
+        .attr("transform", `translate(${hyphy_axis_width-1}, ${line_plot_offset})`)
         .call(statistic_axis);
       
-    bar_axis_svg.append('g')
+    hyphy_axis_svg.append('g')
       .attr('transform', 'translate(70, 350)')
       .append("text")
         .attr('x', 0)
         .attr('y', 0)
-        .text('Magical evolutionary statistic')
+        .text('Evolutionary rate')
         .attr('transform', 'rotate(270)');
+
+    const categories = [
+      { id: 'alpha', color: 'black' },
+      { id: 'beta (background)', color: 'DarkGrey' },
+      { id: 'beta (T_cells)', color: legend['T_cells'] },
+      { id: 'beta (Monocytes)', color: legend['Monocytes'] },
+      { id: 'beta (Plasma)', color: legend['Plasma'] }
+    ];
+    const plot_g = plot_svg.append('g')
+      .attr("transform", `translate(20, ${line_plot_offset})`);
+
+    categories.forEach(function(category) {
+      var line = d3.svg.line()
+        .x(function(d,i) { return site_scale(i); })
+        .y(function(d,i) { return statistic_scale(d); });
+
+      plot_g.append("path")
+        .attr("d", line(hyphy[category.id]))
+        .style("stroke", category.color)
+        .style("stroke-width", "2px")
+        .style("fill", "none");
+    });
+
+    const annotation_tiers = 12;
+    hyphy.hxb2.forEach(function(annotated_site, i) {
+        const delta = (i%(annotation_tiers-1))*annotation_plot_height/annotation_tiers,
+        y1 = line_plot_offset - delta,
+        height = line_plot_height + delta,
+        x = site_scale(annotated_site.index);
+      plot_svg.append("line")
+        .attr('x1', x)
+        .attr('x2', x)
+        .attr('y1', y1)
+        .attr('y2', y1+height)
+        .style('stroke', 'LightGrey');
+      plot_svg.append('circle')
+        .attr('cx', x)
+        .attr('cy', y1)
+        .attr('r', 3)
+        .attr('fill', 'black');
+    });
+    hyphy.hxb2.forEach(function(annotated_site, i) {
+      const delta = (i%(annotation_tiers-1))*annotation_plot_height/annotation_tiers,
+        y1 = line_plot_offset - delta,
+        x = site_scale(annotated_site.index);
+      plot_svg.append('text')
+        .attr('x', x+5)
+        .attr('y', y1)
+        .attr('alignment-baseline', 'middle')
+        .text(annotated_site.annotation);
+    });
   }
   initializeStructure(props) {
     const options = {
@@ -324,17 +371,17 @@ class StructuralViz extends Component {
     return (<div id='full-viz' style={template_css}>
       <div id='structure'/>
 
-      <div id='bar-axis-svg'>
-        <svg id='bar-axis' />
+      <div id='hyphy-axis-svg'>
+        <svg id='hyphy-axis' />
       </div>
 
       <div
-        id='bar-chart-div'
+        id='hyphy-chart-div'
         style={{overflowX: "scroll"}}
-        onWheel={e => this.handleBarWheel(e)}
+        onWheel={e => this.handleHyPhyWheel(e)}
       >
         <svg
-          id='bar-chart'
+          id='hyphy-chart'
           width={this.full_pixel_width}
           height={this.row_sizes[1]}
         />
