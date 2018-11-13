@@ -56,7 +56,7 @@ class App extends Component {
     this.patient_ids = ['P01', 'P02', 'P13'];
   }
   componentDidMount() {
-    this.fetchPatientData('P02');
+    this.fetchPatientData('P01');
     document
       .getElementById('hyphy-chart-div')
       .addEventListener("alignmentjs_wheel_event", function(e) {
@@ -105,13 +105,14 @@ class App extends Component {
           </Navbar.Brand>
         </Navbar.Header>
         <Nav pullRight>
-          <NavItem onClick={()=>this.takeSnapshot()}>Snapshot</NavItem>
+          { /*<NavItem onClick={()=>this.takeSnapshot()}>Snapshot</NavItem>*/ }
+
           {self.patient_ids.map(patient_id => {
             return (<NavItem
               eventKey={patient_id}
               key={patient_id}
-              active={patient_id == self.state.patient}
-              onSelect={(eventKey)=>this.setState({patient_id: patient_id})}
+              active={patient_id == self.state.patient_id}
+              onSelect={(eventKey)=>this.fetchPatientData(patient_id)}
             >
               {patient_id}
             </NavItem>);
@@ -260,6 +261,7 @@ class StructuralViz extends Component {
       hyphy_axis_svg = d3.select("#hyphy-axis")
         .attr("width", hyphy_axis_width)
         .attr("height", hyphy_axis_height);
+      hyphy_axis_svg.html('');
 
       hyphy_axis_svg.append("g")
         .attr("class", "axis")
@@ -267,7 +269,7 @@ class StructuralViz extends Component {
         .call(statistic_axis);
       
     hyphy_axis_svg.append('g')
-      .attr('transform', 'translate(70, 350)')
+      .attr('transform', 'translate(60, 350)')
       .append("text")
         .attr('x', 0)
         .attr('y', 0)
@@ -346,8 +348,9 @@ class StructuralViz extends Component {
         quality : 'medium',
         background: '#FFF'
       },
-      structure_div = document.getElementById('structure'),
-      viewer = pv.Viewer(structure_div, options),
+      structure_div = document.getElementById('structure');
+    structure_div.innerHTML = '';
+    const viewer = pv.Viewer(structure_div, options),
       structure = pv.io.pdb(props.structure, options),
       chain = structure.select({chain: 'A'});
     const geom = viewer.cartoon('protein', chain);
