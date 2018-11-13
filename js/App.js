@@ -75,7 +75,7 @@ class App extends Component {
     }
   }
   fetchPatientData(patient_id) {
-    d3.json(`/data/${patient_id}_cFEL/${patient_id}.json`, (err, json) => {
+    d3.json(`/data/${patient_id}/dashboard.json`, (err, json) => {
       this.setState({
         patient_id: patient_id,
         fasta: json.fasta,

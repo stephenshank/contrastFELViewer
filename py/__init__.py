@@ -94,7 +94,7 @@ def get_plot_data(hyphy_indices, added_alignment, reference, hyphy_data, output)
     hxb2 = added_alignment.sequence('HXB2_GP120')
     hxb2_map = np.arange(added_alignment.number_of_sites)[hxb2 != '-']
     hxb2_output = []
-    with open('data/gp120_annotations.csv') as hxb2_file:
+    with open('data/input/gp120_annotations.csv') as hxb2_file:
         reader = DictReader(hxb2_file)
         for row in reader:
             hxb2_index = int(row['fastaIndex'])
@@ -152,15 +152,15 @@ def bundle_json(input, output, patient_id):
     with open(input) as file:
         fasta = file.read()
 
-    newick_path = 'data/%s_cFEL/%s.new' % (patient_id, patient_id)
+    newick_path = 'data/input/%s.new' % patient_id
     with open(newick_path) as file:
         newick = file.read()
 
-    fel_json_path = 'data/%s_cFEL/%s_mappedIndices.json' % (patient_id, patient_id)
-    with open(fel_json_path) as file:
+    hyphy_path = 'data/%s/mappedIndices.json' % patient_id
+    with open(hyphy_path) as file:
         hyphy = json.load(file)
 
-    with open('data/3jwo.pdb') as file:
+    with open('data/input/3jwo.pdb') as file:
         structure = file.read()
 
     with open(output, 'w') as file:
