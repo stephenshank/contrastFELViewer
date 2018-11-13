@@ -20,7 +20,26 @@ require("phylotree");
 const legend = {
   Monocytes: 'red',
   Plasma: 'blue',
-  T_cells: 'Goldenrod'
+  T_cells: 'Goldenrod',
+  Background: 'DarkGrey',
+  Synonymous: 'black',
+  "Monocytes vs Plasma": "purple",
+  "Monocytes vs T_cells": "orange",
+  "Plasma vs T_cells": "green"
+};
+
+const rgb_legend = {
+  "Monocytes vs Plasma": {R: 128/255, G: 0/255, B: 128/255},
+  "Monocytes vs T_cells": {R: 255/255, G: 150/255, B: 0/255},
+  "Plasma vs T_cells": {R: 0/255, G: 128/255, B: 0/255}
+};
+
+const threeToOne = {
+  'CYS': 'C', 'ASP': 'D', 'SER': 'S', 'GLN': 'Q', 'LYS': 'K',
+  'ILE': 'I', 'PRO': 'P', 'THR': 'T', 'PHE': 'F', 'ASN': 'N', 
+  'GLY': 'G', 'HIS': 'H', 'LEU': 'L', 'ARG': 'R', 'TRP': 'W', 
+  'ALA': 'A', 'VAL': 'V', 'GLU': 'E', 'TYR': 'Y', 'MET': 'M',
+  'NAG': '*', 'FUL': '*'
 };
 
 
@@ -37,7 +56,7 @@ class App extends Component {
     this.patient_ids = ['P01', 'P02', 'P13'];
   }
   componentDidMount() {
-    this.fetchPatientData('P01');
+    this.fetchPatientData('P02');
     document
       .getElementById('hyphy-chart-div')
       .addEventListener("alignmentjs_wheel_event", function(e) {
@@ -305,6 +324,19 @@ class StructuralViz extends Component {
         .attr('alignment-baseline', 'middle')
         .text(annotated_site.annotation);
     });
+    Object.keys(rgb_legend).forEach(function(pair) {
+      hyphy['P-value for ' + pair].forEach(function(site) {
+        if(site.added) {
+          plot_svg.append('rect')
+            .attr('x', site_scale(+site.added)-site_size/2)
+            .attr('y', 0)
+            .attr('width', site_size)
+            .attr('height', 500)
+            .attr('fill', legend[pair])
+            .attr('opacity', .5);
+        }
+      });
+    });
   }
   initializeStructure(props) {
     const options = {
@@ -320,12 +352,30 @@ class StructuralViz extends Component {
       chain = structure.select({chain: 'A'});
     const geom = viewer.cartoon('protein', chain);
     viewer.autoZoom();
+    const background_color = .9;
     geom.colorBy(new pv.color.ColorOp(function(atom, out, index) {
-      const background_color = .8;
-      out[index] = background_color;
-      out[index + 1] = background_color;
-      out[index + 2] = background_color;
-      out[index + 3] = background_color;
+      var r_color = background_color,
+        g_color = background_color,
+        b_color = background_color;
+      
+      Object.keys(rgb_legend).forEach(function(pair) {
+        const p_values = props.hyphy['P-value for ' + pair];
+        if(p_values) {
+          const resnum = atom.residue().num(),
+            pdb_index = resnum - 33 - (resnum > 124 ? 198 - 124 - 1: 0),
+            should_highlight = p_values.map(site=>site.pdb)
+            .indexOf(pdb_index) > -1;
+          if(should_highlight) {
+            r_color = rgb_legend[pair].R;
+            g_color = rgb_legend[pair].G;
+            b_color = rgb_legend[pair].B;
+          }
+        }
+      });
+      out[index] = r_color;
+      out[index + 1] = g_color;
+      out[index + 2] = b_color;
+      out[index + 3] = 1;
     }));
 
     function setColorForAtom(go, atom, color){
@@ -348,7 +398,9 @@ class StructuralViz extends Component {
       }
       if (picked !== null){
         var atom = picked.target();
-        var index = atom.residue().num();
+        var residue = atom.residue();
+        var index = residue.num();
+        console.log(index, threeToOne[residue._name]);
         //document.getElementById('changes').innerHTML = (index+1) + changes[index]
         var color = [0,0,0,0];
         picked.node().getColorForAtom(atom, color);
@@ -389,17 +441,25 @@ class StructuralViz extends Component {
 
       <div>
         <svg width={this.column_sizes[0]} height={this.row_sizes[1]}>
-          <g transform="translate(60, 10)">
+          <g transform="translate(30, 10)">
             <rect x="0" y="0" width="20" height="20" fill={legend.Monocytes} />
             <text x="25" y="10" textAnchor="start" alignmentBaseline="middle">Monocytes</text>
           </g>
-          <g transform="translate(260, 10)">
+          <g transform="translate(140, 10)">
             <rect x="0" y="0" width="20" height="20" fill={legend.Plasma} />
             <text x="25" y="10" textAnchor="start" alignmentBaseline="middle">Plasma</text>
           </g>
-          <g transform="translate(460, 10)">
+          <g transform="translate(250, 10)">
             <rect x="0" y="0" width="20" height="20" fill={legend.T_cells} />
             <text x="25" y="10" textAnchor="start" alignmentBaseline="middle">T cell</text>
+          </g>
+          <g transform="translate(360, 10)">
+            <rect x="0" y="0" width="20" height="20" fill={legend.Background} />
+            <text x="25" y="10" textAnchor="start" alignmentBaseline="middle">Background</text>
+          </g>
+          <g transform="translate(470, 10)">
+            <rect x="0" y="0" width="20" height="20" fill={legend.Synonymous} />
+            <text x="25" y="10" textAnchor="start" alignmentBaseline="middle">Synonymous</text>
           </g>
         </svg>
       </div>

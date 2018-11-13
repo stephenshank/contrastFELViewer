@@ -21,7 +21,7 @@ rule remove_all_gap_columns:
 rule added_alignment:
   input:
     reference="data/ref_struct.fasta",
-    patient=rules.translate.output.fasta
+    patient=rules.remove_all_gap_columns.output.fasta
   output:
     fasta="data/{patient_id}_cFEL/{patient_id}_added.fasta"
   shell:

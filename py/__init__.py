@@ -57,7 +57,7 @@ def remove_all_gap_columns(input, output_fasta, output_json):
     
     result = {"indices": indices.tolist(), "no_gaps": header}
     with open(output_json, 'w') as output_file:
-        json.dump(result, output_file)
+        json.dump(result, output_file, indent=4)
 
 
 def get_plot_data(hyphy_indices, added_alignment, reference, hyphy_data, output):
@@ -85,6 +85,8 @@ def get_plot_data(hyphy_indices, added_alignment, reference, hyphy_data, output)
     for category in categories:
         index = headers.index(category)
         data = np.array([row[index] for row in hyphy_data["MLE"]["content"]["0"]])
+        percentile = np.percentile(data, 95)
+        data[data > percentile] = percentile
         hyphy_output = np.zeros(added_alignment.number_of_sites)
         hyphy_output[no_gap_indices] = data[hyphy_indices]
         output_dict[category] = hyphy_output.tolist()
@@ -102,10 +104,43 @@ def get_plot_data(hyphy_indices, added_alignment, reference, hyphy_data, output)
                     'index': int(hxb2_map[hxb2_index])+1
                 })
     output_dict['hxb2'] = hxb2_output
-
+    pairs = [('Monocytes', 'Plasma'), ('Monocytes', 'T_cells'), ('Plasma', 'T_cells')]
+    pdb = added_alignment.sequence('3JWO')
+    pdb_ungapped = pdb[pdb != '-']
+    pdb_map = np.arange(added_alignment.number_of_sites)[pdb != '-']
+    invert = lambda index, indicial_map: int(np.argmax(indicial_map == index))
+    for pair in pairs:
+        item1 = pair[0]
+        item2 = pair[1]
+        header = 'P-value for %s vs %s' % (item1, item2)
+        if not header in headers:
+            header = 'P-value for %s vs %s' % (item2, item1)
+        index = headers.index(header)
+        all_sites = enumerate(hyphy_data['MLE']['content']['0'])
+        selected_sites = [
+            {'original': i, 'pvalue': val[index]} for i, val in all_sites if val[index] < .1
+        ]
+        for selected_site in selected_sites:
+            print('original index', selected_site['original'])
+            ungapped_index = invert(selected_site['original'], hyphy_indices)
+            print('ungapped index', ungapped_index)
+            added_index = no_gap_indices[ungapped_index]
+            print('added index', added_index)
+            pdb_index = invert(added_index, pdb_map)
+            print('pdb index', pdb_index)
+            pdb_character = pdb_ungapped[pdb_index]
+            added_character = pdb[added_index]
+            if added_character != '-':
+                print('added:', added_index, added_character, ', pdb:', pdb_index, pdb_character)
+                assert pdb_character == added_character
+                selected_site['pdb'] = int(pdb_index+1)
+                selected_site['added'] = int(added_index+1)
+                selected_site['pdbchar'] = pdb_character
+                selected_site['addedchar'] = added_character
+        output_dict['P-value for %s vs %s' % (item1, item2)] = selected_sites
     with open(output, 'w') as output_file:
-        json.dump(output_dict, output_file)
-    
+        json.dump(output_dict, output_file, indent=4)
+
 
 def translate(input, output):
     alignment = Alignment(input)
@@ -135,5 +170,5 @@ def bundle_json(input, output, patient_id):
             "hyphy": hyphy,
             "structure": structure
         }
-        json.dump(output, file)
+        json.dump(output, file, indent=4)
 
