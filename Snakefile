@@ -1,6 +1,21 @@
 from py import *
 
 
+PATIENT_IDS = ['P01', 'P02', 'P13']
+
+rule unpack:
+  input:
+    tar="data/thai.tar.gz"
+  output:
+    expand("data/input/{patient_id}.fasta", patient_id=PATIENT_IDS),
+    expand("data/input/{patient_id}.new", patient_id=PATIENT_IDS),
+    expand("data/input/{patient_id}.fna.FEL.json", patient_id=PATIENT_IDS),
+    "data/input/3jwo.pdb",
+    "data/input/gp120_annotations.csv",
+    "data/input/ref_struct.fasta"
+  shell:
+    "tar -xvzf data/thai.tar.gz -C data/input"
+
 rule translate:
   input:
     fasta="data/input/{patient_id}.fasta"
@@ -49,5 +64,5 @@ rule json:
 
 rule all:
   input:
-    expand(rules.json.output.json, patient_id=['P01', 'P02', 'P13'])
+    expand(rules.json.output.json, patient_id=PATIENT_IDS)
 

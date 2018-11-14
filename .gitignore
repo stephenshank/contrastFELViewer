@@ -4,5 +4,4 @@ __pycache__
 .ipynb_checkpoints
 .yalc
 yalc.lock
-data
 node_modules
