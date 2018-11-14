@@ -41,7 +41,15 @@ class Alignment:
     def translate(self):
         amino_acids = []
         for i in range(self.number_of_sequences):
-            translated = Seq(''.join(self.sequence_data[i, :])).translate(gap='-')
+            nucleotides = np.array(self.sequence_data[i, :], dtype='<U1')
+            for i in range(0, len(nucleotides), 3):
+                codon = str(''.join(nucleotides[i:i+3]))
+                if codon.count('-') < 3:
+                    codon = codon.replace('-', 'N')
+                    nucleotides[i] = codon[0]
+                    nucleotides[i+1] = codon[1]
+                    nucleotides[i+2] = codon[2]
+            translated = Seq(''.join(nucleotides)).translate(gap='-')
             amino_acids.append(translated)
         self.sequence_data = np.array(amino_acids, dtype='<U1')
 

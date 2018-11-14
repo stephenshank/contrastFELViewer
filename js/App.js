@@ -364,9 +364,11 @@ class StructuralViz extends Component {
       Object.keys(rgb_legend).forEach(function(pair) {
         const p_values = props.hyphy['P-value for ' + pair];
         if(p_values) {
-          const resnum = atom.residue().num(),
-            pdb_index = resnum - 33 - (resnum > 124 ? 198 - 124 - 1: 0),
-            should_highlight = p_values.map(site=>site.pdb)
+          var resnum = atom.residue().num(),
+            pdb_index = resnum - 33;
+            pdb_index +=  - (resnum > 124 ? 198 - 124 - 1: 0);
+            pdb_index +=  - (resnum > 299 ? 329 - 299 - 1: 0);
+          const should_highlight = p_values.map(site=>site.pdb)
             .indexOf(pdb_index) > -1;
           if(should_highlight) {
             r_color = rgb_legend[pair].R;
@@ -381,6 +383,7 @@ class StructuralViz extends Component {
       out[index + 3] = 1;
     }));
 
+    /* for debugging
     function setColorForAtom(go, atom, color){
       var view = go.structure().createEmptyView();
       view.addAtom(atom);
@@ -416,6 +419,7 @@ class StructuralViz extends Component {
       }
       viewer.requestRedraw();
     });
+    */
   }
   render() {
     const template_css = {

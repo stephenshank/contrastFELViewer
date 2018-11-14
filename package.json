@@ -41,6 +41,6 @@
   },
   "scripts": {
     "start": "./node_modules/.bin/webpack-dev-server --open --host 0.0.0.0",
-    "dag": "snakemake --dag data/P01_cFEL/P01.json | dot -Tsvg > dag.svg && open dag.svg && rm dag.svg"
+    "dag": "snakemake --dag data/P01/dashboard.json | dot -Tsvg > dag.svg && open dag.svg && rm dag.svg"
   }
 }
