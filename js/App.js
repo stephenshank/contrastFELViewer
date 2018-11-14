@@ -5,7 +5,7 @@ import {
   BaseAlignment, BaseTree, fastaParser, ScrollBroadcaster, SequenceAxis,
   sortFASTAAndNewick, computeLabelWidth
 } from 'alignment.js';
-import { Navbar, Nav, NavDropdown, NavItem, Grid, Row, Col } from 'react-bootstrap';
+import { Navbar, Nav, NavItem, Grid, Row, Col } from 'react-bootstrap';
 import html2canvas from 'html2canvas';
 import 'bootstrap/dist/css/bootstrap.css'; 
 import 'bootstrap/dist/css/bootstrap-theme.css';
@@ -20,18 +20,18 @@ require("phylotree");
 const legend = {
   Monocytes: 'red',
   Plasma: 'blue',
-  T_cells: 'Goldenrod',
+  T_cells: 'green',
   Background: 'DarkGrey',
   Synonymous: 'black',
-  "Monocytes vs Plasma": "purple",
+  "Monocytes vs Plasma": "orange",
   "Monocytes vs T_cells": "orange",
-  "Plasma vs T_cells": "green"
+  "Plasma vs T_cells": "orange"
 };
 
 const rgb_legend = {
-  "Monocytes vs Plasma": {R: 128/255, G: 0/255, B: 128/255},
+  "Monocytes vs Plasma": {R: 255/255, G: 150/255, B: 0/255},
   "Monocytes vs T_cells": {R: 255/255, G: 150/255, B: 0/255},
-  "Plasma vs T_cells": {R: 0/255, G: 128/255, B: 0/255}
+  "Plasma vs T_cells": {R: 255/255, G: 150/255, B: 0/255}
 };
 
 const threeToOne = {
@@ -326,16 +326,24 @@ class StructuralViz extends Component {
         .attr('alignment-baseline', 'middle')
         .text(annotated_site.annotation);
     });
+    var site_counts = 0;
     Object.keys(rgb_legend).forEach(function(pair) {
       hyphy['P-value for ' + pair].forEach(function(site) {
         if(site.added) {
+          site_counts += 1;
           plot_svg.append('rect')
             .attr('x', site_scale(+site.added)-site_size/2)
             .attr('y', 0)
             .attr('width', site_size)
             .attr('height', 500)
             .attr('fill', legend[pair])
-            .attr('opacity', .5);
+            .attr('opacity', .3);
+          plot_svg.append('text')
+            .attr('x', site_scale(+site.added)+12)
+            .attr('y', annotation_plot_height + 20*(site_counts-1))
+            .attr('fill', legend[pair])
+            .attr('font-weight', 900)
+            .text(pair.replace('_', ' '));
         }
       });
     });
@@ -514,43 +522,6 @@ class StructuralViz extends Component {
 StructuralViz.defaultProps = {
   site_size: 20,
   label_padding: 5
-}
-
-class OldStructuralViz extends Component {
-  componentDidUpdate() {
-    const tcell_line = d3.svg.line()
-      .x((d,i)=>x_scale(i+1))
-      .y(d=>y_scale((d[1]-d[0])/(d[9]+.001)));
-    plot_svg.append("path")
-      .attr("class", "line")
-      .attr("d", tcell_line(data))
-      .style("fill", "none")
-      .style("stroke-width", 2)
-      .style("stroke", "#000");
-
-    // For html2canvas
-    d3.selectAll('path')
-      .attr('fill', 'none')
-      .attr('stroke', '#999')
-      .attr('stroke-width', '2px');
-    d3.selectAll('.axis text')
-      .attr('font', 'san-serif');
-    d3.selectAll('.axis path')
-      .attr('fill', 'none')
-      .attr('stroke', '#000')
-      .attr('shape-rendering', 'crispEdges');
-    d3.selectAll('.axis line')
-      .attr('fill', 'none')
-      .attr('stroke', '#000')
-      .attr('shape-rendering', 'crispEdges');
-    d3.selectAll('.axis')
-      .attr('shape-rendering', 'crispEdges')
-      .attr('font', '10 px sans-serif');
-    d3.selectAll('.branch-tracer')
-      .attr('stroke', '#bbb')
-      .attr('stroke-dasharray', '3,4')
-      .attr('stroke-width', '1px');
-  }
 }
 
 ReactDOM.render(
