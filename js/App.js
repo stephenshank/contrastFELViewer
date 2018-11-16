@@ -21,18 +21,14 @@ const legend = {
   Monocytes: 'red',
   Plasma: 'blue',
   T_cells: 'green',
-  Background: 'DarkGrey',
+  Background: 'Grey',
   Synonymous: 'black',
   "Monocytes vs Plasma": "orange",
   "Monocytes vs T_cells": "orange",
   "Plasma vs T_cells": "orange"
 };
 
-const rgb_legend = {
-  "Monocytes vs Plasma": {R: 255/255, G: 150/255, B: 0/255},
-  "Monocytes vs T_cells": {R: 255/255, G: 150/255, B: 0/255},
-  "Plasma vs T_cells": {R: 255/255, G: 150/255, B: 0/255}
-};
+const rgb_legend = { R: 255/255, G: 165/255, B: 0/255};
 
 const threeToOne = {
   'CYS': 'C', 'ASP': 'D', 'SER': 'S', 'GLN': 'Q', 'LYS': 'K',
@@ -180,6 +176,7 @@ class StructuralViz extends Component {
         phylotree_size
       );
       phylotree.style_edges(function(element, data) {
+        element.style('stroke', 'Grey');
         if(data.target.Monocytes) element.style('stroke', legend.Monocytes);
         if(data.target.Plasma) element.style('stroke', legend.Plasma);
         if(data.target.T_cells) element.style('stroke', legend.T_cells);
@@ -278,7 +275,7 @@ class StructuralViz extends Component {
 
     const categories = [
       { id: 'alpha', color: 'black' },
-      { id: 'beta (background)', color: 'DarkGrey' },
+      { id: 'beta (background)', color: 'Grey' },
       { id: 'beta (T_cells)', color: legend['T_cells'] },
       { id: 'beta (Monocytes)', color: legend['Monocytes'] },
       { id: 'beta (Plasma)', color: legend['Plasma'] }
@@ -299,7 +296,7 @@ class StructuralViz extends Component {
     });
 
     const annotation_tiers = 12;
-    hyphy.hxb2.forEach(function(annotated_site, i) {
+    hyphy.siteAnnotations.forEach(function(annotated_site, i) {
         const delta = (i%(annotation_tiers-1))*annotation_plot_height/annotation_tiers,
         y1 = line_plot_offset - delta,
         height = line_plot_height + delta,
@@ -314,38 +311,18 @@ class StructuralViz extends Component {
         .attr('cx', x)
         .attr('cy', y1)
         .attr('r', 3)
-        .attr('fill', 'black');
+        .attr('fill', annotated_site.annotation ? 'black' : 'orange');
     });
-    hyphy.hxb2.forEach(function(annotated_site, i) {
+    hyphy.siteAnnotations.forEach(function(annotated_site, i) {
       const delta = (i%(annotation_tiers-1))*annotation_plot_height/annotation_tiers,
         y1 = line_plot_offset - delta,
         x = site_scale(annotated_site.index);
       plot_svg.append('text')
         .attr('x', x+5)
         .attr('y', y1)
+        .attr('fill', annotated_site.annotation ? 'black' : 'orange')
         .attr('alignment-baseline', 'middle')
-        .text(annotated_site.annotation);
-    });
-    var site_counts = 0;
-    Object.keys(rgb_legend).forEach(function(pair) {
-      hyphy['P-value for ' + pair].forEach(function(site) {
-        if(site.added) {
-          site_counts += 1;
-          plot_svg.append('rect')
-            .attr('x', site_scale(+site.added)-site_size/2)
-            .attr('y', 0)
-            .attr('width', site_size)
-            .attr('height', 500)
-            .attr('fill', legend[pair])
-            .attr('opacity', .3);
-          plot_svg.append('text')
-            .attr('x', site_scale(+site.added)+12)
-            .attr('y', annotation_plot_height + 20*(site_counts-1))
-            .attr('fill', legend[pair])
-            .attr('font-weight', 900)
-            .text(pair.replace('_', ' '));
-        }
-      });
+        .text(annotated_site.annotation ? annotated_site.annotation : annotated_site.category);
     });
   }
   initializeStructure(props) {
@@ -363,35 +340,29 @@ class StructuralViz extends Component {
       chain = structure.select({chain: 'A'});
     const geom = viewer.cartoon('protein', chain);
     viewer.autoZoom();
-    const background_color = .9;
+    const background_color = .95,
+      sites_to_highlight = props.hyphy.siteAnnotations
+        .filter(site=>site.pdb)
+        .map(site=>site.pdb);
     geom.colorBy(new pv.color.ColorOp(function(atom, out, index) {
       var r_color = background_color,
         g_color = background_color,
         b_color = background_color;
-      
-      Object.keys(rgb_legend).forEach(function(pair) {
-        const p_values = props.hyphy['P-value for ' + pair];
-        if(p_values) {
-          var resnum = atom.residue().num(),
-            pdb_index = resnum - 33;
-            pdb_index +=  - (resnum > 124 ? 198 - 124 - 1: 0);
-            pdb_index +=  - (resnum > 299 ? 329 - 299 - 1: 0);
-          const should_highlight = p_values.map(site=>site.pdb)
-            .indexOf(pdb_index) > -1;
-          if(should_highlight) {
-            r_color = rgb_legend[pair].R;
-            g_color = rgb_legend[pair].G;
-            b_color = rgb_legend[pair].B;
-          }
-        }
-      });
+        var resnum = atom.residue().num(),
+          pdb_index = resnum - 33;
+        pdb_index +=  - (resnum > 124 ? 198 - 124 - 1: 0);
+        pdb_index +=  - (resnum > 299 ? 329 - 299 - 1: 0);
+      if(sites_to_highlight.indexOf(pdb_index) > -1) {
+        r_color = rgb_legend.R;
+        g_color = rgb_legend.G;
+        b_color = rgb_legend.B;
+      }
       out[index] = r_color;
       out[index + 1] = g_color;
       out[index + 2] = b_color;
       out[index + 3] = 1;
     }));
 
-    /* for debugging
     function setColorForAtom(go, atom, color){
       var view = go.structure().createEmptyView();
       view.addAtom(atom);
@@ -413,8 +384,11 @@ class StructuralViz extends Component {
       if (picked !== null){
         var atom = picked.target();
         var residue = atom.residue();
-        var index = residue.num();
-        console.log(index, threeToOne[residue._name]);
+        var resnum = residue.num();
+        var pdb_index = resnum - 33;
+        pdb_index +=  - (resnum > 124 ? 198 - 124 - 1: 0);
+        pdb_index +=  - (resnum > 299 ? 329 - 299 - 1: 0);
+        console.log(pdb_index, threeToOne[residue._name]);
         //document.getElementById('changes').innerHTML = (index+1) + changes[index]
         var color = [0,0,0,0];
         picked.node().getColorForAtom(atom, color);
@@ -427,7 +401,6 @@ class StructuralViz extends Component {
       }
       viewer.requestRedraw();
     });
-    */
   }
   render() {
     const template_css = {

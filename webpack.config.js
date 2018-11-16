@@ -52,5 +52,6 @@ module.exports = {
   devServer: {
     contentBase: __dirname,
     disableHostCheck: true
-  } 
+  },
+  devtool: 'inline-source-map'
 }

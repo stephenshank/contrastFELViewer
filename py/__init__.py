@@ -57,7 +57,7 @@ class Alignment:
 def remove_all_gap_columns(input, output_fasta, output_json):
     alignment = Alignment(input)
     indices = alignment.remove_all_gap_columns()
-    count_gaps = np.sum(alignment.sequence_data == '-', axis=0)
+    count_gaps = np.sum(alignment.sequence_data == '-', axis=1)
     no_gap = np.argmin(count_gaps)
     assert count_gaps[no_gap] == 0
     header = alignment.headers[no_gap]
@@ -117,17 +117,25 @@ def get_plot_data(hyphy_indices, added_alignment, reference, hyphy_data, output)
     pdb_ungapped = pdb[pdb != '-']
     pdb_map = np.arange(added_alignment.number_of_sites)[pdb != '-']
     invert = lambda index, indicial_map: int(np.argmax(indicial_map == index))
-    for pair in pairs:
-        item1 = pair[0]
-        item2 = pair[1]
-        header = 'P-value for %s vs %s' % (item1, item2)
-        if not header in headers:
-            header = 'P-value for %s vs %s' % (item2, item1)
-        index = headers.index(header)
+    all_categories = ['overall'] + pairs
+    all_selected_sites = []
+    for category in all_categories:
         all_sites = enumerate(hyphy_data['MLE']['content']['0'])
+        if isinstance(category, tuple):
+            item1 = category[0]
+            item2 = category[1]
+            header = 'P-value for %s vs %s' % (item1, item2)
+            if not header in headers:
+                header = 'P-value for %s vs %s' % (item2, item1)
+            output_key = '%s vs %s' % (item1, item2)
+        else:
+            header = 'p-value (overall)'
+            output_key = 'Overall'
+        index = headers.index(header)
         selected_sites = [
-            {'original': i, 'pvalue': val[index]} for i, val in all_sites if val[index] < .1
+            {'original': i, 'pvalue': val[index], 'category': output_key.replace('_', ' ')} for i, val in all_sites if val[index] < .1
         ]
+
         for selected_site in selected_sites:
             print('original index', selected_site['original'])
             ungapped_index = invert(selected_site['original'], hyphy_indices)
@@ -137,15 +145,19 @@ def get_plot_data(hyphy_indices, added_alignment, reference, hyphy_data, output)
             pdb_index = invert(added_index, pdb_map)
             print('pdb index', pdb_index)
             pdb_character = pdb_ungapped[pdb_index]
-            added_character = pdb[added_index]
-            if added_character != '-':
-                print('added:', added_index, added_character, ', pdb:', pdb_index, pdb_character)
-                assert pdb_character == added_character
+            pdb_added_character = pdb[added_index]
+            if pdb_added_character != '-':
+                print('added:', added_index, pdb_added_character, ', pdb:', pdb_index, pdb_character)
+                assert pdb_character == pdb_added_character
                 selected_site['pdb'] = int(pdb_index+1)
-                selected_site['added'] = int(added_index+1)
                 selected_site['pdbchar'] = pdb_character
-                selected_site['addedchar'] = added_character
-        output_dict['P-value for %s vs %s' % (item1, item2)] = selected_sites
+            selected_site['index'] = int(added_index+1)
+        all_selected_sites += selected_sites
+        
+        output_dict['siteAnnotations'] = sorted(
+            hxb2_output + all_selected_sites,
+            key=lambda x: x['index']
+        )
     with open(output, 'w') as output_file:
         json.dump(output_dict, output_file, indent=4)
 
