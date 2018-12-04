@@ -18,14 +18,14 @@ require("phylotree");
 
 
 const legend = {
-  Monocytes: 'red',
-  Plasma: 'blue',
-  T_cells: 'green',
+  LI: 'red',
+  JI: 'blue',
+  D: 'green',
   Background: 'Grey',
   Synonymous: 'black',
-  "Monocytes vs Plasma": "orange",
-  "Monocytes vs T_cells": "orange",
-  "Plasma vs T_cells": "orange"
+  "LI vs JI": "orange",
+  "LI vs D": "orange",
+  "JI vs D": "orange"
 };
 
 const rgb_legend = { R: 255/255, G: 165/255, B: 0/255};
@@ -49,10 +49,10 @@ class App extends Component {
       hyphy: null,
       structure: null
     };
-    this.patient_ids = ['P01', 'P02', 'P13'];
+    this.patient_ids = ['P19'];
   }
   componentDidMount() {
-    this.fetchPatientData('P01');
+    this.fetchPatientData('P19');
     document
       .getElementById('hyphy-chart-div')
       .addEventListener("alignmentjs_wheel_event", function(e) {
@@ -71,7 +71,7 @@ class App extends Component {
     }
   }
   fetchPatientData(patient_id) {
-    d3.json(`/data/${patient_id}/dashboard.json`, (err, json) => {
+    d3.json(`/data/${patient_id}_Env_Cells_noBL/dashboard.json`, (err, json) => {
       this.setState({
         patient_id: patient_id,
         fasta: json.fasta,
@@ -177,9 +177,9 @@ class StructuralViz extends Component {
       );
       phylotree.style_edges(function(element, data) {
         element.style('stroke', 'Grey');
-        if(data.target.Monocytes) element.style('stroke', legend.Monocytes);
-        if(data.target.Plasma) element.style('stroke', legend.Plasma);
-        if(data.target.T_cells) element.style('stroke', legend.T_cells);
+        if(data.target.LI) element.style('stroke', legend.LI);
+        if(data.target.JI) element.style('stroke', legend.JI);
+        if(data.target.D) element.style('stroke', legend.D);
       });
       this.phylotree = phylotree;
 
@@ -236,10 +236,10 @@ class StructuralViz extends Component {
     const y_min = 0;
     const y_max = d3.max([
       d3.max(hyphy.alpha),
-      d3.max(hyphy['beta (T_cells)']),
-      d3.max(hyphy['beta (Monocytes)']),
+      d3.max(hyphy['beta (LI)']),
+      d3.max(hyphy['beta (JI)']),
       d3.max(hyphy['beta (background)']),
-      d3.max(hyphy['beta (Plasma)'])
+      d3.max(hyphy['beta (D)'])
     ]);
 
     const hyphy_axis_width = this.column_sizes[1],
@@ -276,9 +276,9 @@ class StructuralViz extends Component {
     const categories = [
       { id: 'alpha', color: 'black' },
       { id: 'beta (background)', color: 'Grey' },
-      { id: 'beta (T_cells)', color: legend['T_cells'] },
-      { id: 'beta (Monocytes)', color: legend['Monocytes'] },
-      { id: 'beta (Plasma)', color: legend['Plasma'] }
+      { id: 'beta (LI)', color: legend['T_cells'] },
+      { id: 'beta (JI)', color: legend['Monocytes'] },
+      { id: 'beta (D)', color: legend['Plasma'] }
     ];
     const plot_g = plot_svg.append('g')
       .attr("transform", `translate(20, ${line_plot_offset})`);
@@ -430,22 +430,22 @@ class StructuralViz extends Component {
       <div>
         <svg width={this.column_sizes[0]} height={this.row_sizes[1]}>
           <g transform="translate(30, 10)">
-            <rect x="0" y="0" width="20" height="20" fill={legend.Monocytes} />
-            <text x="25" y="10" textAnchor="start" alignmentBaseline="middle">Monocytes</text>
+            <rect x="0" y="0" width="20" height="20" fill={legend.LI} />
+            <text x="25" y="10" textAnchor="start" alignmentBaseline="middle">LI</text>
           </g>
-          <g transform="translate(140, 10)">
-            <rect x="0" y="0" width="20" height="20" fill={legend.Plasma} />
-            <text x="25" y="10" textAnchor="start" alignmentBaseline="middle">Plasma</text>
+          <g transform="translate(130, 10)">
+            <rect x="0" y="0" width="20" height="20" fill={legend.JI} />
+            <text x="25" y="10" textAnchor="start" alignmentBaseline="middle">JI</text>
           </g>
-          <g transform="translate(250, 10)">
-            <rect x="0" y="0" width="20" height="20" fill={legend.T_cells} />
-            <text x="25" y="10" textAnchor="start" alignmentBaseline="middle">T cell</text>
+          <g transform="translate(230, 10)">
+            <rect x="0" y="0" width="20" height="20" fill={legend.D} />
+            <text x="25" y="10" textAnchor="start" alignmentBaseline="middle">D</text>
           </g>
-          <g transform="translate(360, 10)">
+          <g transform="translate(320, 10)">
             <rect x="0" y="0" width="20" height="20" fill={legend.Background} />
             <text x="25" y="10" textAnchor="start" alignmentBaseline="middle">Background</text>
           </g>
-          <g transform="translate(470, 10)">
+          <g transform="translate(430, 10)">
             <rect x="0" y="0" width="20" height="20" fill={legend.Synonymous} />
             <text x="25" y="10" textAnchor="start" alignmentBaseline="middle">Synonymous</text>
           </g>

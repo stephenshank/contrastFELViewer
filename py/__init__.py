@@ -68,27 +68,36 @@ def remove_all_gap_columns(input, output_fasta, output_json):
         json.dump(result, output_file, indent=4)
 
 
-def get_plot_data(hyphy_indices, added_alignment, reference, hyphy_data, output):
+def get_plot_data(hyphy_indices, added_alignment, reference, hyphy_data_path, output):
     with open(hyphy_indices) as hyphy_indices_file:
         hyphy_indices = json.load(hyphy_indices_file)
     no_gap_header = hyphy_indices["no_gaps"]
     hyphy_indices = np.array(hyphy_indices["indices"], dtype=np.int)
     added_alignment = Alignment(added_alignment)
     reference = SeqIO.to_dict(SeqIO.parse(reference, 'fasta'))
-    with open(hyphy_data) as hyphy_data_file:
+    with open(hyphy_data_path) as hyphy_data_file:
         hyphy_data = json.load(hyphy_data_file)
     output_dict = {}
     no_gap_seq = added_alignment.sequence(no_gap_header)
     no_gap_indices = np.arange(added_alignment.number_of_sites)[no_gap_seq != '-']
 
     headers = [row[0] for row in hyphy_data["MLE"]["headers"]]
-    categories = [
-        "alpha",
-        "beta (T_cells)",
-        "beta (Monocytes)",
-        "beta (background)",
-        "beta (Plasma)"
-    ]
+    if 'Cells' in hyphy_data_path:
+        categories = [
+            "alpha",
+            "beta (LI)",
+            "beta (JI)",
+            "beta (background)",
+            "beta (D)"
+        ]
+    else:
+        categories = [
+            "alpha",
+            "beta (T_cells)",
+            "beta (Monocytes)",
+            "beta (background)",
+            "beta (Plasma)"
+        ]
 
     for category in categories:
         index = headers.index(category)
@@ -112,7 +121,7 @@ def get_plot_data(hyphy_indices, added_alignment, reference, hyphy_data, output)
                     'index': int(hxb2_map[hxb2_index])+1
                 })
     output_dict['hxb2'] = hxb2_output
-    pairs = [('Monocytes', 'Plasma'), ('Monocytes', 'T_cells'), ('Plasma', 'T_cells')]
+    pairs = [('LI', 'JI'), ('LI', 'D'), ('JI', 'D')]
     pdb = added_alignment.sequence('3JWO')
     pdb_ungapped = pdb[pdb != '-']
     pdb_map = np.arange(added_alignment.number_of_sites)[pdb != '-']
@@ -129,7 +138,7 @@ def get_plot_data(hyphy_indices, added_alignment, reference, hyphy_data, output)
                 header = 'P-value for %s vs %s' % (item2, item1)
             output_key = '%s vs %s' % (item1, item2)
         else:
-            header = 'p-value (overall)'
+            header = 'P-value (overall)'
             output_key = 'Overall'
         index = headers.index(header)
         selected_sites = [
@@ -168,22 +177,20 @@ def translate(input, output):
     alignment.write(output)
 
 
-def bundle_json(input, output, patient_id):
-    with open(input) as file:
+def bundle_json(fasta_input, newick_input, json_input, json_output):
+    with open(fasta_input) as file:
         fasta = file.read()
 
-    newick_path = 'data/input/%s.new' % patient_id
-    with open(newick_path) as file:
+    with open(newick_input) as file:
         newick = file.read()
 
-    hyphy_path = 'data/%s/mappedIndices.json' % patient_id
-    with open(hyphy_path) as file:
+    with open(json_input) as file:
         hyphy = json.load(file)
 
     with open('data/input/3jwo.pdb') as file:
         structure = file.read()
 
-    with open(output, 'w') as file:
+    with open(json_output, 'w') as file:
         output = {
             "fasta": fasta,
             "newick": newick,
